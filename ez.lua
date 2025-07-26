@@ -1,25 +1,26 @@
---== Einstellungen ==--
+-- Silent Aim Script für DaHood mit 100% Treffer und zentriertem FOV-Kreis
+
+-- Services
+local Players          = game:GetService("Players")
+local LocalPlayer      = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService       = game:GetService("RunService")
+local Camera           = workspace.CurrentCamera
+
+-- Einstellungen
 local SETTINGS = {
-    SilentAim    = false,             -- Startzustand Silent Aim
-    Prediction   = 0.165,             -- Vorhersage für bewegliche Ziele
-    FOV          = 50,                -- Sichtfeldradius
-    Target       = nil,               -- momentan gewähltes Ziel
+    SilentAim    = false,      -- Startzustand
+    Prediction   = 0.165,      -- Vorhersage
+    FOV          = 50,         -- Radius des FOV-Kreises
+    Target       = nil,        -- aktuell gewähltes Ziel
     Keys = {
         ToggleMenu   = Enum.KeyCode.T,
         SelectTarget = Enum.KeyCode.E,
         ToggleSilent = Enum.KeyCode.R,
-    }
+    },
 }
 
---== Services ==--
-local Players          = game:GetService("Players")
-local LocalPlayer      = Players.LocalPlayer
-local Mouse            = LocalPlayer:GetMouse()
-local UserInputService = game:GetService("UserInputService")
-local RunService       = game:GetService("RunService")
-
---== Hilfsfunktionen ==--
--- Prüft, ob ein Spieler als Ziel taugt (nicht downed, nicht sich selbst usw.)
+-- Prüft, ob ein Spieler als Ziel taugt
 local function isValidTarget(player)
     if not player or player == LocalPlayer then return false end
     local char = player.Character
@@ -36,29 +37,26 @@ local function isValidTarget(player)
     return true
 end
 
--- Sucht den nächsten gültigen Spieler im FOV
+-- Findet den nächsten gültigen Spieler im FOV
 local function getClosest()
-    local cam    = workspace.CurrentCamera
-    local pos    = cam.CFrame.Position
-    local look   = cam.CFrame.LookVector
-    local best   = nil
-    local bestAngle = math.rad(SETTINGS.FOV)
+    local camPos  = Camera.CFrame.Position
+    local camDir  = Camera.CFrame.LookVector
+    local bestPl, bestAngle = nil, math.rad(SETTINGS.FOV)
     for _, pl in ipairs(Players:GetPlayers()) do
         if isValidTarget(pl) then
             local head = pl.Character.Head
             local predicted = head.Position + head.Velocity * SETTINGS.Prediction
-            local dir = (predicted - pos).Unit
-            local angle = math.acos(look:Dot(dir))
+            local dir = (predicted - camPos).Unit
+            local angle = math.acos(camDir:Dot(dir))
             if angle < bestAngle then
-                bestAngle = angle
-                best = pl
+                bestAngle, bestPl = angle, pl
             end
         end
     end
-    return best
+    return bestPl
 end
 
---== GUI erstellen ==--
+-- GUI erstellen
 local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 gui.Name = "SilentAimGUI"
 
@@ -95,57 +93,55 @@ targetLabel.Font = Enum.Font.Gotham
 targetLabel.TextSize = 14
 targetLabel.Text = "Target: None"
 
---== FOV‑Kreis zeichnen ==--
-local circle = Drawing.new("Circle")
-circle.Thickness  = 2
-circle.NumSides   = 100
-circle.Radius     = SETTINGS.FOV
-circle.Color      = Color3.fromRGB(255, 80, 80)
-circle.Filled     = false
-circle.Visible    = true
+-- FOV-Kreis in der Bildschirmmitte
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness    = 2
+fovCircle.NumSides     = 100
+fovCircle.Radius       = SETTINGS.FOV
+fovCircle.Color        = Color3.fromRGB(255, 80, 80)
+fovCircle.Filled       = false
+fovCircle.Visible      = true
 
 RunService.RenderStepped:Connect(function()
-    circle.Position = Vector2.new(Mouse.X, Mouse.Y)
-    circle.Radius   = SETTINGS.FOV
+    local center = Camera.ViewportSize * 0.5
+    fovCircle.Position = Vector2.new(center.X, center.Y)
 end)
 
---== Tasten‑Ereignisse ==--
+-- Tasten-Eingaben
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == SETTINGS.Keys.ToggleMenu then
         frame.Visible = not frame.Visible
     elseif input.KeyCode == SETTINGS.Keys.SelectTarget then
-        local pl = getClosest()
-        SETTINGS.Target = pl
-        targetLabel.Text = "Target: " .. (pl and pl.Name or "None")
+        SETTINGS.Target = getClosest()
+        targetLabel.Text = "Target: " .. (SETTINGS.Target and SETTINGS.Target.Name or "None")
     elseif input.KeyCode == SETTINGS.Keys.ToggleSilent then
         SETTINGS.SilentAim = not SETTINGS.SilentAim
         silentLabel.Text = "Silent Aim: " .. (SETTINGS.SilentAim and "ON" or "OFF")
     end
 end)
 
---== Silent Aim Hook ==--
--- Basierend auf der Silent‑Aimlock‑Technik für DaHood :contentReference[oaicite:0]{index=0}
-local mt = getrawmetatable(game)
-local oldIndex = mt.__index
-setreadonly(mt,false)
-mt.__index = newcclosure(function(t,k)
-    if t:IsA("Mouse") and (k=="Hit" or k=="Target")
+-- Namecall-Hook für 100% Silent Aim
+local mt          = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args   = {...}
+    if method == "FireServer"
        and SETTINGS.SilentAim
-       and isValidTarget(SETTINGS.Target) then
+       and isValidTarget(SETTINGS.Target)
+       and typeof(args[1]) == "CFrame" then
 
         local head = SETTINGS.Target.Character:FindFirstChild("Head")
         if head then
-            local predictedCF = head.CFrame + head.Velocity * SETTINGS.Prediction
-            if k=="Hit" then
-                return predictedCF
-            else -- k=="Target"
-                return head
-            end
+            args[1] = head.CFrame + head.Velocity * SETTINGS.Prediction
         end
     end
-    return oldIndex(t,k)
+    return oldNamecall(self, unpack(args))
 end)
-setreadonly(mt,true)
 
-print("Silent Aim for DaHood loaded. Menü mit [T], Zielwahl mit [E], Toggle Silent mit [R].")
+setreadonly(mt, true)
+
+print("Silent Aim geladen! [T]=Menu [E]=Select Target [R]=Toggle Silent")
