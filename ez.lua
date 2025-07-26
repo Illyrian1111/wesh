@@ -1,5 +1,4 @@
--- Silent Aim Script für DaHood mit 100% Treffer und zentriertem FOV-Kreis
-
+-- Silent Aim Script für DaHood mit permanent aktiviertem Silent Aim
 -- Services
 local Players          = game:GetService("Players")
 local LocalPlayer      = Players.LocalPlayer
@@ -9,14 +8,14 @@ local Camera           = workspace.CurrentCamera
 
 -- Einstellungen
 local SETTINGS = {
-    SilentAim    = false,      -- Startzustand
-    Prediction   = 0.165,      -- Vorhersage
-    FOV          = 50,         -- Radius des FOV-Kreises
-    Target       = nil,        -- aktuell gewähltes Ziel
+    SilentAim    = true,      -- jetzt dauerhaft AN
+    Prediction   = 0.165,     -- Vorhersage
+    FOV          = 50,        -- Radius des FOV-Kreises
+    Target       = nil,       -- aktuell gewähltes Ziel
     Keys = {
         ToggleMenu   = Enum.KeyCode.T,
         SelectTarget = Enum.KeyCode.E,
-        ToggleSilent = Enum.KeyCode.R,
+        -- R-Key wird nicht mehr verwendet
     },
 }
 
@@ -61,7 +60,7 @@ local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 gui.Name = "SilentAimGUI"
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 90)
+frame.Size = UDim2.new(0, 220, 0, 120)
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 frame.BackgroundTransparency = 0.3
@@ -75,17 +74,18 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.Text = "Silent Aim Menu"
 
-local silentLabel = Instance.new("TextLabel", frame)
-silentLabel.Position = UDim2.new(0, 5, 0, 25)
-silentLabel.Size = UDim2.new(1, -10, 0, 20)
-silentLabel.BackgroundTransparency = 1
-silentLabel.TextColor3 = Color3.new(1,1,1)
-silentLabel.Font = Enum.Font.Gotham
-silentLabel.TextSize = 14
-silentLabel.Text = "Silent Aim: OFF"
+local silentButton = Instance.new("TextButton", frame)
+silentButton.Position = UDim2.new(0, 5, 0, 25)
+silentButton.Size = UDim2.new(1, -10, 0, 25)
+silentButton.BackgroundTransparency = 0.1
+silentButton.BackgroundColor3 = Color3.fromRGB(50,50,60)
+silentButton.TextColor3 = Color3.new(1,1,1)
+silentButton.Font = Enum.Font.Gotham
+silentButton.TextSize = 14
+silentButton.Text = "Silent Aim: ON"
 
 local targetLabel = Instance.new("TextLabel", frame)
-targetLabel.Position = UDim2.new(0, 5, 0, 50)
+targetLabel.Position = UDim2.new(0, 5, 0, 60)
 targetLabel.Size = UDim2.new(1, -10, 0, 20)
 targetLabel.BackgroundTransparency = 1
 targetLabel.TextColor3 = Color3.new(1,1,1)
@@ -115,13 +115,16 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     elseif input.KeyCode == SETTINGS.Keys.SelectTarget then
         SETTINGS.Target = getClosest()
         targetLabel.Text = "Target: " .. (SETTINGS.Target and SETTINGS.Target.Name or "None")
-    elseif input.KeyCode == SETTINGS.Keys.ToggleSilent then
-        SETTINGS.SilentAim = not SETTINGS.SilentAim
-        silentLabel.Text = "Silent Aim: " .. (SETTINGS.SilentAim and "ON" or "OFF")
     end
 end)
 
--- Namecall-Hook für 100% Silent Aim
+-- Klick auf Silent-Aim-Button
+silentButton.MouseButton1Click:Connect(function()
+    SETTINGS.SilentAim = not SETTINGS.SilentAim
+    silentButton.Text = "Silent Aim: " .. (SETTINGS.SilentAim and "ON" or "OFF")
+end)
+
+-- Namecall-Hook für Silent Aim
 local mt          = getrawmetatable(game)
 local oldNamecall = mt.__namecall
 setreadonly(mt, false)
@@ -144,4 +147,4 @@ end)
 
 setreadonly(mt, true)
 
-print("Silent Aim geladen! [T]=Menu [E]=Select Target [R]=Toggle Silent")
+print("Silent Aim geladen! [T]=Menu [E]=Select Target  (Silent AIM standardmäßig AN)")
